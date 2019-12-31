@@ -25,7 +25,7 @@ public class ImportTools {
 
     public static void main(String[] args) throws Exception {
 
-        String propFilePath = null;
+        String propFilePath = "/home/bigdata/pandadb-import-tools/testdata/pandadb-import-tools.conf"; // null;
         if (args.length > 0) {
             propFilePath = args[0];
         }
@@ -73,6 +73,9 @@ public class ImportTools {
 
         FileWriter logFw = new FileWriter(logFilePath);
 
+        System.out.println("==== begin import ====");
+        System.out.println(nowDate());
+        System.out.println(props);
 
         GraphDatabaseService db = new GraphDatabaseFactory().newEmbeddedDatabase(graphFile);
 
@@ -86,6 +89,9 @@ public class ImportTools {
         tx.close();
         logFw.flush();
         logFw.close();
+
+        System.out.println("==== end import ====");
+        System.out.println(nowDate());
 //        //System.out.println("====end==="+maxCount+"nodes");
 //        System.out.println("====end==="+nodeCount+"nodes");
 //        String endTime = nowDate();

@@ -18,7 +18,7 @@ public class ImportNodeToSolr {
     String solrPropPrefix = "";
 
     long countPerSolrCommit = 1000;  // solr一次写入间隔节点数
-    long countPerLog = 100000;  // 日志一次写入间隔节点数
+    long countPerLog = 10000;  // 日志一次写入间隔节点数
 
     public ImportNodeToSolr(String zkUri, String collectionName)
     {
@@ -58,12 +58,14 @@ public class ImportNodeToSolr {
                 solrClient.commit();
             }
             if(nodeCount % countPerLog == 0) {
+                System.out.println(String.format("%d,%d\n", nodeCount, System.currentTimeMillis()) );
                 logFileWriter.write(String.format("%d,%d\n", nodeCount, System.currentTimeMillis()) );
                 logFileWriter.flush();
             }
         }
         solrClient.commit();
         if(nodeCount % countPerLog != 0) {
+            System.out.println(String.format("%d,%d\n", nodeCount, System.currentTimeMillis()) );
             logFileWriter.write(String.format("%d,%d\n", nodeCount, System.currentTimeMillis()) );
             logFileWriter.flush();
         }
