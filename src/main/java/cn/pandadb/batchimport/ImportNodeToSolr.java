@@ -17,8 +17,8 @@ public class ImportNodeToSolr {
     String solrLabelName = "labels";
     String solrPropPrefix = "";
 
-    long countPerSolrCommit = 1000;
-    long countPerLog = 10000;
+    long countPerSolrCommit = 1000;  // solr一次写入间隔节点数
+    long countPerLog = 10000;  // 日志一次写入间隔节点数
 
     public ImportNodeToSolr(String zkUri, String collectionName)
     {
