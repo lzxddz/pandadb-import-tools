@@ -60,7 +60,7 @@ public class ImportTools {
         }
 
         if (props.containsKey("external.properties.store.es.port")) {
-            esPort = Integer.getInteger(props.get("external.properties.store.es.port").toString()) ;
+            esPort = Integer.parseInt(props.get("external.properties.store.es.port").toString()) ;
         }
         else {
             throw new Exception("Configure File Error: external.properties.store.es.port is not exist! ");
@@ -86,7 +86,6 @@ public class ImportTools {
         else {
             throw new Exception("Configure File Error: external.properties.store.es.type is not exist! ");
         }
-
         Transaction tx = db.beginTx();
         ResourceIterator<Node> nodes = db.getAllNodes().iterator();
         ImportNodeToEs esImport = new ImportNodeToEs(esHost, esPort, esSchema, indexName, typeName);
@@ -96,7 +95,7 @@ public class ImportTools {
 
     public static void main(String[] args) throws Exception {
 
-        String propFilePath = "/home/bigdata/pandadb-import-tools/testdata/pandadb-import-tools.conf"; // null;
+        String propFilePath = "testdata/pandadb-import-tools.conf"; // null;
         if (args.length > 0) {
             propFilePath = args[0];
         }
@@ -137,32 +136,39 @@ public class ImportTools {
         FileWriter logFw = new FileWriter(logFilePath);
 
         System.out.println("==== begin import ====");
-        System.out.println(nowDate());
+        String beginTime = nowDate();
+        System.out.println(beginTime);
         System.out.println(props);
 
         GraphDatabaseService db = new GraphDatabaseFactory().newEmbeddedDatabase(graphFile);
-
-        switch (importTo) {
-            case "solr":
-                importToSolr(props, db, logFw);
-                break;
-            case "es":
-                importToEs(props, db, logFw);
-                break;
-            default:
-                System.out.println("invalid import to!");
+        System.out.println(importTo);
+        try {
+            switch (importTo) {
+                case "solr":
+                    importToSolr(props, db, logFw);
+                    break;
+                case "es":
+                    importToEs(props, db, logFw);
+                    break;
+                default:
+                    System.out.println("invalid import to!");
+            }
+        }
+        finally {
+            db.shutdown();
         }
 
         logFw.flush();
         logFw.close();
 
         System.out.println("==== end import ====");
-        System.out.println(nowDate());
+        String endTime = nowDate();
+        System.out.println(endTime);
 //        //System.out.println("====end==="+maxCount+"nodes");
 //        System.out.println("====end==="+nodeCount+"nodes");
 //        String endTime = nowDate();
-//        System.out.println("Begin Time: " +beginTime);
-//        System.out.println("End Time: " +endTime);
+        System.out.println("Begin Time: " +beginTime);
+        System.out.println("End Time: " +endTime);
 
 
     }

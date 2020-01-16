@@ -8,6 +8,7 @@ import scala.collection.JavaConverters._
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import org.neo4j.graphdb._
+import org.neo4j.values.storable.Values
 import org.neo4j.values.storable._
 import org.apache.http.HttpHost
 import org.elasticsearch.client.{RequestOptions, RestClient, RestHighLevelClient}
@@ -33,7 +34,6 @@ import org.elasticsearch.script.mustache.{SearchTemplateRequest, SearchTemplateR
 
 class ImportNodeToEs(host: String, port: Int, schema: String, indexName: String, typeName: String) {
 
-  var esClient = createClient(host, port, schema)
 
   val idFieldName = "id" // 存id字段名称
   val labelFieldName = "labels" // 存label字段名称
@@ -41,23 +41,26 @@ class ImportNodeToEs(host: String, port: Int, schema: String, indexName: String,
   val countPerCommit = 1000 // 一次批量写入间隔节点数
   val countPerLog = 10000 // 日志一次写入间隔节点数
 
-  def createClient(host: String, port: Int, schema: String = "http"): RestHighLevelClient = {
+  private def createClient(host: String, port: Int, schema: String = "http"): RestHighLevelClient = {
     val httpHost = new HttpHost(host, port, schema)
     val builder = RestClient.builder(httpHost)
     val client = new RestHighLevelClient(builder)
     if (!indexExists(client, indexName)){
-      createIndex(client, indexName,typeName)
+      System.out.println("create index: "+indexName)
+      val res = createIndex(client, indexName,typeName)
+      if (res) System.out.println("index create success!")
+      else System.out.println("index create failed!")
     }
     client
   }
 
-  def indexExists(client: RestHighLevelClient, indexName: String): Boolean = {
+  private def indexExists(client: RestHighLevelClient, indexName: String): Boolean = {
     val request = new GetIndexRequest()
     request.indices(indexName)
     client.indices.exists(request, RequestOptions.DEFAULT)
   }
 
-  def createIndex(client: RestHighLevelClient, indexName: String, typeName: String): Boolean = {
+  private def createIndex(client: RestHighLevelClient, indexName: String, typeName: String): Boolean = {
     val indexRequest: CreateIndexRequest = new CreateIndexRequest(indexName)
     indexRequest.mapping(typeName,"{\"_all\":{\"type\":\"text\"}}", XContentType.JSON)
     val indexResponse: CreateIndexResponse = client.indices().create(indexRequest, RequestOptions.DEFAULT)
@@ -65,7 +68,7 @@ class ImportNodeToEs(host: String, port: Int, schema: String, indexName: String,
   }
 
 
-  def addData(client: RestHighLevelClient, indexName: String, typeName: String, id: String, builder: XContentBuilder): String = {
+  private def addData(client: RestHighLevelClient, indexName: String, typeName: String, id: String, builder: XContentBuilder): String = {
     val indexRequest: IndexRequest = new IndexRequest(indexName, typeName, id)
     indexRequest.source(builder)
     indexRequest.setRefreshPolicy(WriteRequest.RefreshPolicy.WAIT_UNTIL)
@@ -73,13 +76,22 @@ class ImportNodeToEs(host: String, port: Int, schema: String, indexName: String,
     indexResponse.getId
   }
 
+
   def doImport(nodes: ResourceIterator[Node], logFileWriter: FileWriter): Unit = {
+    val esClient = createClient(host, port, schema)
+
     var nodeCount = 0
     var bulkRequest = new BulkRequest()
+    bulkRequest.setRefreshPolicy(WriteRequest.RefreshPolicy.WAIT_UNTIL)
+
+    System.out.println(s"$nodeCount,${System.currentTimeMillis}\n")
+    logFileWriter.write(s"$nodeCount,${System.currentTimeMillis}\n")
+
     while (nodes.hasNext) {
+      nodeCount += 1
       val n1 = nodes.next
       val indexId = n1.getId.toString
-      val indexRequest = new IndexRequest(indexName, typeName, indexId)
+      var indexRequest = new IndexRequest(indexName, typeName, indexId)
 
       val builder = XContentFactory.jsonBuilder
       builder.startObject()
@@ -88,22 +100,60 @@ class ImportNodeToEs(host: String, port: Int, schema: String, indexName: String,
       val labels = n1.getLabels.asScala
       builder.startArray(labelFieldName)
       for (lbl <- labels) {
-        builder.field(lbl.name)
+        builder.value(lbl.name())
       }
       builder.endArray()
 
       val props = n1.getAllProperties
 
       for (entry <- props.entrySet.asScala) {
-        builder.field(propFieldNamePrefix + entry.getKey, entry.getValue)
+        val k = propFieldNamePrefix + entry.getKey
+        val v = entry.getValue
+        if (! v.getClass.isArray){
+          builder.field(k, v)
+        }
+        else {
+          builder.startArray(k)
+
+          if (v.isInstanceOf[Array[Boolean]]){
+            v.asInstanceOf[Array[Boolean]].foreach(v1=>builder.value(v1))
+          }
+          if (v.isInstanceOf[Array[Int]]){
+            v.asInstanceOf[Array[Int]].foreach(v1=>builder.value(v1))
+          }
+          if (v.isInstanceOf[Array[Long]]){
+            v.asInstanceOf[Array[Long]].foreach(v1=>builder.value(v1))
+          }
+          if (v.isInstanceOf[Array[Short]]){
+            v.asInstanceOf[Array[Short]].foreach(v1=>builder.value(v1))
+          }
+          if (v.isInstanceOf[Array[Float]]){
+            v.asInstanceOf[Array[Float]].foreach(v1=>builder.value(v1))
+          }
+          if (v.isInstanceOf[Array[Double]]){
+            v.asInstanceOf[Array[Double]].foreach(v1=>builder.value(v1))
+          }
+          if (v.isInstanceOf[Array[Char]]){
+            v.asInstanceOf[Array[Char]].foreach(v1=>builder.value(v1))
+          }
+          if (v.isInstanceOf[Array[String]]){
+            v.asInstanceOf[Array[String]].foreach(v1=>builder.value(v1))
+          }
+
+          builder.endArray()
+        }
       }
 
+      builder.endObject()
+
       indexRequest.source(builder)
+
       bulkRequest.add(indexRequest)
-      nodeCount += 1
+
       if (nodeCount % countPerCommit == 0) {
         esClient.bulk(bulkRequest, RequestOptions.DEFAULT)
         bulkRequest = new BulkRequest()
+        bulkRequest.setRefreshPolicy(WriteRequest.RefreshPolicy.WAIT_UNTIL)
       }
       if (nodeCount % countPerLog == 0) {
         System.out.println(s"$nodeCount,${System.currentTimeMillis}\n")
@@ -114,6 +164,8 @@ class ImportNodeToEs(host: String, port: Int, schema: String, indexName: String,
     if (nodeCount % countPerCommit != 0) {
       esClient.bulk(bulkRequest, RequestOptions.DEFAULT)
     }
+
+    esClient.close()
 
     if (nodeCount % countPerLog != 0) {
       System.out.println(s"$nodeCount,${System.currentTimeMillis}\n")
