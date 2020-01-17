@@ -27,6 +27,7 @@
     </dependencies>
 
     <build>
+        <!--mvn clean scala:compile compile package-->
         <plugins>
             <plugin>
                 <groupId>org.scala-tools</groupId>
