@@ -82,7 +82,7 @@ class ImportNodeToEs(host: String, port: Int, schema: String, indexName: String,
 
     var nodeCount = 0
     var bulkRequest = new BulkRequest()
-    bulkRequest.setRefreshPolicy(WriteRequest.RefreshPolicy.WAIT_UNTIL)
+//    bulkRequest.setRefreshPolicy(WriteRequest.RefreshPolicy.WAIT_UNTIL)
 
     System.out.println(s"$nodeCount,${System.currentTimeMillis}\n")
     logFileWriter.write(s"$nodeCount,${System.currentTimeMillis}\n")
@@ -153,7 +153,7 @@ class ImportNodeToEs(host: String, port: Int, schema: String, indexName: String,
       if (nodeCount % countPerCommit == 0) {
         esClient.bulk(bulkRequest, RequestOptions.DEFAULT)
         bulkRequest = new BulkRequest()
-        bulkRequest.setRefreshPolicy(WriteRequest.RefreshPolicy.WAIT_UNTIL)
+//        bulkRequest.setRefreshPolicy(WriteRequest.RefreshPolicy.WAIT_UNTIL)
       }
       if (nodeCount % countPerLog == 0) {
         System.out.println(s"$nodeCount,${System.currentTimeMillis}\n")
